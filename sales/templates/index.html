@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Data Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">Sales Data Dashboard</h2>
+
+        <!-- Filter Form -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" id="start_date" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" id="end_date" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label for="category" class="form-label">Category</label>
+                <select id="category" class="form-select">
+                    <option value="">Select Category</option>
+                    <!-- Category options will be populated here -->
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="platform" class="form-label">Platform</label>
+                <select id="platform" class="form-select">
+                    <option value="">Select Platform</option>
+                    <!-- Platform options will be populated here -->
+                </select>
+            </div>
+        </div>
+
+        <div class="text-center mb-4">
+            <button id="apply_filters" class="btn btn-primary">Apply Filters</button>
+        </div>
+        <div class="text-center mb-4">
+            <button id="download_data" class="btn btn-primary">Download</button>
+        </div>
+
+        <!-- Loading spinner -->
+        <div id="loading_spinner" class="text-center" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <!-- Line Chart Container -->
+        <div class="row">
+            <div class="col-md-12">
+                <canvas id="salesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vanilla JS -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const applyFiltersButton = document.getElementById('apply_filters');
+            const download_data = document.getElementById('download_data');
+
+            const startDateInput = document.getElementById('start_date');
+            const endDateInput = document.getElementById('end_date');
+            const categorySelect = document.getElementById('category');
+            const platformSelect = document.getElementById('platform');
+            const loadingSpinner = document.getElementById('loading_spinner');
+            let salesChartInstance = null;  // Store the chart instance
+
+            // Load category and platform data on page load
+            fetch('http://127.0.0.1:8000/api/sales-data/')
+                .then(response => response.json())
+                .then(data => {
+                    // Populate category dropdown
+                    const categories = data.category_data;
+                    categories.forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category.name;
+                        option.textContent = category.name;
+                        categorySelect.appendChild(option);
+                    });
+
+                    // Populate platform dropdown
+                    const platforms = data.platform_data;
+                    platforms.forEach(platform => {
+                        const option = document.createElement('option');
+                        option.value = platform.platform_name;
+                        option.textContent = platform.platform_name;
+                        platformSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.log('Error loading category and platform data:', error));
+
+            // Function to fetch and render the chart with applied filters
+            function fetchDataAndRenderChart(filters = {}) {
+                // Show loading spinner
+                loadingSpinner.style.display = 'block';
+
+                const url = new URL('http://127.0.0.1:8000/api/sales-data/');
+                Object.keys(filters).forEach(key => url.searchParams.append(key, filters[key]));
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Hide loading spinner
+                        loadingSpinner.style.display = 'none';
+
+                        const salesData = data.sales_data;
+                        const months = salesData.map(sale => sale.month_of_sale);
+                        const quantities = salesData.map(sale => sale.total_quantity_sold);
+
+                        // Destroy the existing chart if it exists
+                        if (salesChartInstance) {
+                            salesChartInstance.destroy();
+                        }
+
+                        // Create a new chart instance
+                        const ctx = document.getElementById('salesChart').getContext('2d');
+                        salesChartInstance = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: months,
+                                datasets: [{
+                                    label: 'Total Quantity Sold',
+                                    data: quantities,
+                                    borderColor: '#007bff',
+                                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                                    fill: true,
+                                    tension: 0.4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(tooltipItem) {
+                                                return `${tooltipItem.label}: ${tooltipItem.raw} items`;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        // Hide loading spinner in case of error
+                        loadingSpinner.style.display = 'none';
+                        console.log('Error fetching sales data:', error);
+                    });
+            }
+
+            // Initial chart load without filters
+            fetchDataAndRenderChart();
+
+            // Apply filters and update chart when button is clicked
+            applyFiltersButton.addEventListener('click', function() {
+                const startDate = startDateInput.value;
+                const endDate = endDateInput.value;
+                const category = categorySelect.value;
+                const platform = platformSelect.value;
+
+                const filters = {};
+                if (startDate) filters.start_date = startDate;
+                if (endDate) filters.end_date = endDate;
+                if (category) filters.category = category;
+                if (platform) filters.platform = platform;
+
+                // Fetch and render data with filters
+                fetchDataAndRenderChart(filters);
+            });
+
+            download_data.addEventListener('click', function() {
+                const startDate = startDateInput.value;
+                const endDate = endDateInput.value;
+                const category = categorySelect.value;
+                const platform = platformSelect.value;
+
+                const filters = {};
+                if (startDate) filters.start_date = startDate;
+                if (endDate) filters.end_date = endDate;
+                if (category) filters.category = category;
+                if (platform) filters.platform = platform;
+
+                // Fetch and render data with filters
+                const url = new URL('http://127.0.0.1:8000/api/download/sales-data/');
+                Object.keys(filters).forEach(key => url.searchParams.append(key, filters[key]));
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data)
+                        if(data.status == true){
+                            window.location.href = `http://127.0.0.1:8000/${data.file_url}`
+                        }
+                    })
+            });
+
+        });
+
+
+    </script>
+</body>
+</html>
