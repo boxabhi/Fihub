@@ -42,7 +42,7 @@ Takes two numbers and returns the sum.
 
 ## Demo
 
-[Insert gif or link to demo](https://www.youtube.com/watch?v=tsDBiK9RuUs)
+[Link for demo](https://www.youtube.com/watch?v=tsDBiK9RuUs)
 
 
 ## How to setup project
