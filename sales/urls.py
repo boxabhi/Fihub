@@ -1,7 +1,9 @@
 from django.urls import path
-from .views import SummaryMetricsAPI,SalesDataAPI,DownloadSalesDataAPI
+from .views import LeaderBoardAPI,SummaryMetricsAPI,SalesDataAPI,DownloadSalesDataAPI,PublishNotification
 
 urlpatterns = [
+
+    path('leaderboard/', LeaderBoardAPI.as_view()),
     
     path('sales-data/', SalesDataAPI.as_view(), name='sales-data'),
     path('download/sales-data/', DownloadSalesDataAPI.as_view(), name='sales-data'),
